@@ -120,7 +120,9 @@ def upload_file(request):
                 else:
                     raise ValueError("Unsupported file type: {}".format(file_extension))
             except Exception as e:
-                return JsonResponse({'error': 'Error extracting text from file: {}'.format(e)}, status=422)
+                response = JsonResponse({'error': 'Error extracting text from file: {}'.format(e)}, status=422)
+                response['Access-Control-Allow-Origin'] = 'https://javallin-frontend.vercel.app'
+                return response
 
         # Compute average embedding for each document
         average_embeddings = [compute_average_embedding(doc_embeddings) for doc_embeddings in embeddings]
