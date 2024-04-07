@@ -74,9 +74,9 @@ DEBUG = True
 # ALLOWED_HOSTS = ['127.0.0.1', '[::1]']
 ALLOWED_HOSTS = ast.literal_eval(os.getenv('ALLOWED_HOSTS', '[]'))
 
-CORS_ALLOWED_ORIGINS = ast.literal_eval(os.getenv('CORS_ALLOWED_ORIGINS', '[]'))
+# CORS_ALLOWED_ORIGINS = ast.literal_eval(os.getenv('CORS_ALLOWED_ORIGINS', '[]'))
 
-# CORS_ALLOWED_ORIGINS = ast.literal_eval(os.getenv('CORS_ALLOWED_ORIGINS', "http://locahlhost:4200")).split(',')
+CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'https://javallin-frontend.vercel.app').split(',')
 
 
 
