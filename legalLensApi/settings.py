@@ -72,13 +72,23 @@ DATABASES = {
 DEBUG = True
 
 # ALLOWED_HOSTS = ['127.0.0.1', '[::1]']
-ALLOWED_HOSTS = ast.literal_eval(os.getenv('ALLOWED_HOSTS', '[]'))
+# ALLOWED_HOSTS = ast.literal_eval(os.getenv('ALLOWED_HOSTS', '[]'))
+
+ALLOWED_HOSTS = ['*']
 
 # CORS_ALLOWED_ORIGINS = ast.literal_eval(os.getenv('CORS_ALLOWED_ORIGINS', '[]'))
 
 # CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'https://javallin-frontend.vercel.app').split(',')
 
-CORS_ALLOWED_ORIGINS = 'https://javallin-frontend.vercel.app'
+# CORS_ALLOWED_ORIGINS = 'https://javallin-frontend.vercel.app'
+
+
+
+CORS_ORIGIN_ALLOW_ALL = True
+
+CORS_ALLOW_CREDENTIALS = True
+
+
 
 
 
