@@ -17,9 +17,13 @@ import numpy as np
 import os
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt 
-from langchain.vectorstores import MongoDBAtlasVectorSearch
-from transformers import TransformersTokenizer
+from langchain_community.vectorstores import MongoDBAtlasVectorSearch
+# from transformers import TransformersTokenizer
 from sentence_transformers import SentenceTransformer
+from langchain_community.llms import HuggingFaceHub
+from langchain.chains import RetrievalQA
+from langchain.embeddings import HuggingFaceInstructEmbeddings
+
 
 MONGODB_URI = os.getenv('DATABASE_URL')
 
@@ -33,7 +37,6 @@ API_URL = os.getenv('API_URL')
 
 headers = {"Authorization": f"Bearer {HUGGINGFACETOKEN}"}
 
-hugging_face_model_name = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 
@@ -201,8 +204,9 @@ def upload_file(request):
 
 
 
-# model_name = "sentence-transformers/all-MiniLM-L6-v2"
-# model = SentenceTransformer(model_name)
+model_name = "sentence-transformers/all-MiniLM-L6-v2"
+model = SentenceTransformer(model_name)
+
 # tokenizer = TransformersTokenizer.from_pretrained(model_name)
 
 # def get_embedding(text):
@@ -211,11 +215,18 @@ def upload_file(request):
 #     embedding = model(encoded_text)[0][0]  # Extract first token embedding (CLS)
 #   return embedding.cpu().detach().numpy()
 
-# def chat_constituition(query):
-#     docs = vectorStore.similarity_search(query, K=1)
-#     as_output = docs[0].page_content
-#     vectorStore = MongoDBAtlasVectorSearch(collection,get_embedding)
-#     llm = 
-#     retriever = vectorStore.as_retriever()
-#     qa = RetrievalQA.from_chain_type()
-#     retriever_output = retriever.run()
+
+@csrf_exempt
+@permission_classes([AllowAny])
+def chat_constituition(query):
+    embeddingS = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
+    vectorStore = MongoDBAtlasVectorSearch(collection,embeddingS)
+    docs = vectorStore.similarity_search(query, K=1)
+    as_output = docs[0].page_content
+    
+    llm = HuggingFaceHub(repo_id = "google/flan-t5-xl", model_kwargs={"temperature" : 0, "max_lenght": 64})
+    retriever = vectorStore.as_retriever()
+    qa = RetrievalQA.from_chain_type(llm, chain_type="stuff", retriever= retriever)
+    retriever_output = qa.run()
+
+    return as_output, retriever_output
