@@ -5,7 +5,6 @@ import docx2txt
 from django.shortcuts import render
 from rest_framework import viewsets
 from rest_framework.response import Response
-import torch
 from .models import Case
 from .serializers import CaseDataSerializer, CaseSerializer
 from django import views
@@ -15,11 +14,10 @@ import pymongo
 import requests
 import numpy as np
 import os
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt 
-from langchain.vectorstores import MongoDBAtlasVectorSearch
-from transformers import TransformersTokenizer
-from sentence_transformers import SentenceTransformer
+import pika
+import json
+from rest_framework.renderers import JSONRenderer
+
 
 MONGODB_URI = os.getenv('DATABASE_URL')
 
@@ -30,12 +28,7 @@ HUGGINGFACETOKEN = os.getenv('HUGGINGFACETOKEN')
 HUGGINGFACETOKENWriteToken = "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"
 
 API_URL = os.getenv('API_URL')
-
 headers = {"Authorization": f"Bearer {HUGGINGFACETOKEN}"}
-
-hugging_face_model_name = "sentence-transformers/all-MiniLM-L6-v2"
-
-
 
 
 db = client.sample_mflix
@@ -45,12 +38,8 @@ collectionCases = db.cases
 
 
 
-caseNumber =0
-caseTitle = ""
-court=""
-date=""
-similar_cases_response = []
-
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt  
 
 
 
@@ -95,11 +84,40 @@ def compute_average_embedding(embeddings):
     average_embedding = np.mean(embeddings_array, axis=0)
     return average_embedding.tolist()
 
-# Modify the upload_file function
+
+
+
+
+# Your existing Django imports and settings
+
+# RabbitMQ connection parameters
+RABBITMQ_URL = os.getenv('RABBITMQ_URL')
+QUEUE_NAME = 'upload_file_queue'
+
+# Establish connection to RabbitMQ
+connection = pika.BlockingConnection(pika.URLParameters(RABBITMQ_URL))
+channel = connection.channel()
+
+# Declare the queue
+channel.queue_declare(queue=QUEUE_NAME)
+
 @csrf_exempt
 @permission_classes([AllowAny])
 def upload_file(request):
     if request.method == 'POST' and request.FILES:
+        # Your existing file handling code
+
+        # Your existing processing code
+        # print("Request body:", request.body)      # Print request body
+        # print("Request method:", request.method)  # Print request method (e.g., GET, POST)
+        # print("Request path:", request.path)      # Print request path (e.g., '/upload/')
+        # print("Request GET parameters:", request.GET)  # Print GET parameters
+        # print("Request POST parameters:", request.POST)  # Print POST parameters
+        print("Request files:", request.FILES)    # Print uploaded files
+        # print("Request headers:", request.headers)  # Print request headers
+        # print("Request cookies:", request.COOKIES)  # Print cookies sent with the request
+        # print("Request user:", request.user) 
+
         uploaded_files = request.FILES.getlist('facts of case')
 
         extracted_texts = []
@@ -119,18 +137,20 @@ def upload_file(request):
                     if file_extension == 'pdf':
                         pdf_reader = PyPDF2.PdfReader(in_memory_file)
                         text = '\n'.join([page.extract_text() for page in pdf_reader.pages])
-                        extracted_texts.append(text)
                     elif file_extension == 'docx':
                         text = docx2txt.process(in_memory_file)
+                    
+                    # Check if text extraction was successful before generating embeddings
+                    if text:
                         extracted_texts.append(text)
-                    print(extracted_texts)    
+                        print(extracted_texts)
 
-                    
-                    # Generate embeddings for the extracted text
-                    embedding = generate_embeddings(extracted_texts)
-                    print(embedding)
-                    embeddings.append(embedding)
-                    
+                        # Generate embeddings for the extracted text
+                        embedding = generate_embeddings(text)  # Pass the extracted text here
+                        print(embedding)
+                        embeddings.append(embedding)
+                    else:
+                        raise ValueError("Text extraction failed for file {}".format(f.name))
                 else:
                     raise ValueError("Unsupported file type: {}".format(file_extension))
             except Exception as e:
@@ -141,81 +161,46 @@ def upload_file(request):
         # Compute average embedding for each document
         average_embeddings = [compute_average_embedding(doc_embeddings) for doc_embeddings in embeddings]
 
-        # Compare the uploaded document with documents in your database
-        for average_embedding in average_embeddings:
-            # You need to replace 'Space Movies' with the text you want to compare with
-            # results =  collection.aggregate([
-            #     {
-            #         "$vectorSearch": {
-            #             "queryVector": average_embedding,
-            #             "path": "plot_embeddings",
-            #             "numCandidates": 100,
-            #             "limit": 4,
-            #             "index": "PlotSemanticSearch",
-            #         }
-            #     }
-            # ])
+        # Serialize data to be sent to the queue
+        data_to_queue = {
+            'extracted_texts': extracted_texts,
+            'average_embeddings': average_embeddings,
+            # Add any other data you want to send
+        }
 
-            resultsCases =  collectionCases.aggregate([
-                {
-                    "$vectorSearch": {
-                        "queryVector": average_embedding,
-                        "path": "average_embedding",
-                        "numCandidates": 100,
-                        "limit": 4,
-                        "index": "caseSemanticSearch",
-                    }
-                }
-            ])
+        print(data_to_queue)
+        # Convert data to JSON
+        message_body = json.dumps(data_to_queue)
+
+        # Publish message to the queue
+        channel.basic_publish(exchange='',
+                              routing_key=QUEUE_NAME,
+                              body=message_body)
+
+        # Close connection to RabbitMQ
+        connection.close()
+
+        response = Response({'message': 'Text extraction request queued successfully'}, status=200)
+
+        response.accepted_renderer = JSONRenderer()
+
+        response.renderer_context = {'request': request}  # Set the renderer context explicitly
 
 
-            for doc in resultsCases:
-                # print(doc["title"]
+        response.accepted_media_type = 'application/json'  # Set the media type explicitly
 
-                caseNumber = doc["case_number"]
-                caseTitle = doc["case_title"]
-                court= doc["case_title"]
-                date= doc["date"]
-               
-
-                data = {
-                        "case_number": caseNumber,
-                        "date": date,
-                        "case_title": caseTitle,
-                        "court": court,
-                        }
-                similar_cases_response.append(data)
-
-                case_numbers.append(doc["case_number"])
-
-                # print(doc["case_number"])
-                print(doc)
-
-        return JsonResponse({'message': 'Text extracted successfully', 'data': similar_cases_response, 'case_numbers':len(case_numbers)}, status=200)
-
-    return JsonResponse({'error': 'No file provided'}, status=400)
+        # return JsonResponse({'message': 'Text extracted successfully', 'texts': extracted_texts, 'case_numbers':len(case_numbers)}, status=200)
 
 
 
+        return response
+    
+    response = Response({'error': 'No file provided'}, status=400)
+    response.accepted_renderer = JSONRenderer()
+    response.renderer_context = {'request': request}  # Set the renderer context explicitly
 
+    response.accepted_media_type = 'application/json'  # Set the media type explicitly
 
+    # return JsonResponse({'message': 'Text extracted successfully', 'texts': extracted_texts, 'case_numbers':len(case_numbers)}, status=200)
 
-
-# model_name = "sentence-transformers/all-MiniLM-L6-v2"
-# model = SentenceTransformer(model_name)
-# tokenizer = TransformersTokenizer.from_pretrained(model_name)
-
-# def get_embedding(text):
-#   encoded_text = tokenizer(text, padding="max_length", truncation=True, return_tensors="pt")
-#   with torch.no_grad():
-#     embedding = model(encoded_text)[0][0]  # Extract first token embedding (CLS)
-#   return embedding.cpu().detach().numpy()
-
-# def chat_constituition(query):
-#     docs = vectorStore.similarity_search(query, K=1)
-#     as_output = docs[0].page_content
-#     vectorStore = MongoDBAtlasVectorSearch(collection,get_embedding)
-#     llm = 
-#     retriever = vectorStore.as_retriever()
-#     qa = RetrievalQA.from_chain_type()
-#     retriever_output = retriever.run()
+    return response

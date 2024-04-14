@@ -5,7 +5,6 @@ import docx2txt
 from django.shortcuts import render
 from rest_framework import viewsets
 from rest_framework.response import Response
-import torch
 from .models import Case
 from .serializers import CaseDataSerializer, CaseSerializer
 from django import views
@@ -15,11 +14,7 @@ import pymongo
 import requests
 import numpy as np
 import os
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt 
-from langchain.vectorstores import MongoDBAtlasVectorSearch
-from transformers import TransformersTokenizer
-from sentence_transformers import SentenceTransformer
+
 
 MONGODB_URI = os.getenv('DATABASE_URL')
 
@@ -30,12 +25,7 @@ HUGGINGFACETOKEN = os.getenv('HUGGINGFACETOKEN')
 HUGGINGFACETOKENWriteToken = "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"
 
 API_URL = os.getenv('API_URL')
-
 headers = {"Authorization": f"Bearer {HUGGINGFACETOKEN}"}
-
-hugging_face_model_name = "sentence-transformers/all-MiniLM-L6-v2"
-
-
 
 
 db = client.sample_mflix
@@ -45,12 +35,8 @@ collectionCases = db.cases
 
 
 
-caseNumber =0
-caseTitle = ""
-court=""
-date=""
-similar_cases_response = []
-
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt  
 
 
 
@@ -171,51 +157,12 @@ def upload_file(request):
 
             for doc in resultsCases:
                 # print(doc["title"]
-
-                caseNumber = doc["case_number"]
-                caseTitle = doc["case_title"]
-                court= doc["case_title"]
-                date= doc["date"]
-               
-
-                data = {
-                        "case_number": caseNumber,
-                        "date": date,
-                        "case_title": caseTitle,
-                        "court": court,
-                        }
-                similar_cases_response.append(data)
-
                 case_numbers.append(doc["case_number"])
 
                 # print(doc["case_number"])
                 print(doc)
 
-        return JsonResponse({'message': 'Text extracted successfully', 'data': similar_cases_response, 'case_numbers':len(case_numbers)}, status=200)
+        return JsonResponse({'message': 'Text extracted successfully', 'texts': extracted_texts, 'case_numbers':len(case_numbers)}, status=200)
 
     return JsonResponse({'error': 'No file provided'}, status=400)
 
-
-
-
-
-
-
-# model_name = "sentence-transformers/all-MiniLM-L6-v2"
-# model = SentenceTransformer(model_name)
-# tokenizer = TransformersTokenizer.from_pretrained(model_name)
-
-# def get_embedding(text):
-#   encoded_text = tokenizer(text, padding="max_length", truncation=True, return_tensors="pt")
-#   with torch.no_grad():
-#     embedding = model(encoded_text)[0][0]  # Extract first token embedding (CLS)
-#   return embedding.cpu().detach().numpy()
-
-# def chat_constituition(query):
-#     docs = vectorStore.similarity_search(query, K=1)
-#     as_output = docs[0].page_content
-#     vectorStore = MongoDBAtlasVectorSearch(collection,get_embedding)
-#     llm = 
-#     retriever = vectorStore.as_retriever()
-#     qa = RetrievalQA.from_chain_type()
-#     retriever_output = retriever.run()
