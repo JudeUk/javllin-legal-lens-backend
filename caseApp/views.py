@@ -1,4 +1,5 @@
 from io import BytesIO
+import json
 import tempfile
 import PyPDF2
 import docx2txt
@@ -21,8 +22,9 @@ from langchain_community.vectorstores import MongoDBAtlasVectorSearch
 # from transformers import TransformersTokenizer
 from sentence_transformers import SentenceTransformer
 from langchain_community.llms import HuggingFaceHub
+from langchain.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQA
-from langchain.embeddings import HuggingFaceInstructEmbeddings
+from langchain.embeddings import HuggingFaceInstructEmbeddings,OpenAIEmbeddings
 
 
 MONGODB_URI = os.getenv('DATABASE_URL')
@@ -43,9 +45,10 @@ headers = {"Authorization": f"Bearer {HUGGINGFACETOKEN}"}
 
 db = client.sample_mflix
 collection =db.movies
-collectionCases = db.cases
 
 
+constDb = client.ConstituitionDatabase
+consituitionCollection =constDb.constituitionCollection
 
 
 caseNumber =0
@@ -54,7 +57,16 @@ court=""
 date=""
 similar_cases_response = []
 
+huggingFaceEmbeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
 
+openAIEmbeddings = OpenAIEmbeddings()
+
+vectorstore = MongoDBAtlasVectorSearch(
+    collection=consituitionCollection,
+    embedding = huggingFaceEmbeddings,  # Replace with your text embedding function
+    # embedding=huggingFaceEmbeddings,
+    # index_name="caseSemanticSearch",
+)
 
 
 
@@ -84,18 +96,18 @@ class CaseViewSet(viewsets.ViewSet):
 
 
 
-# Function to generate embeddings for text
-def generate_embeddings(text: str) -> list[float]:
+# Function to generate huggingFaceEmbeddings for text
+def generate_huggingFaceEmbeddings(text: str) -> list[float]:
     response = requests.post(API_URL, headers={"Authorization": f"Bearer {HUGGINGFACETOKENWriteToken}"}, json={"inputs": text})
-    # embeddings = response.json()["outputs"][0]["embeddings"]
+    # huggingFaceEmbeddings = response.json()["outputs"][0]["huggingFaceEmbeddings"]
     return response.json()
 
 # Function to compute the average embedding
-def compute_average_embedding(embeddings):
-    # Convert list of embeddings to numpy array
-    embeddings_array = np.array(embeddings)
+def compute_average_embedding(huggingFaceEmbeddings):
+    # Convert list of huggingFaceEmbeddings to numpy array
+    huggingFaceEmbeddings_array = np.array(huggingFaceEmbeddings)
     # Compute mean along the first axis (axis=0) to get average embedding
-    average_embedding = np.mean(embeddings_array, axis=0)
+    average_embedding = np.mean(huggingFaceEmbeddings_array, axis=0)
     return average_embedding.tolist()
 
 # Modify the upload_file function
@@ -106,7 +118,7 @@ def upload_file(request):
         uploaded_files = request.FILES.getlist('facts of case')
 
         extracted_texts = []
-        embeddings = []
+        huggingFaceEmbeddings = []
         case_numbers = []
 
         for f in uploaded_files:
@@ -129,10 +141,10 @@ def upload_file(request):
                     print(extracted_texts)    
 
                     
-                    # Generate embeddings for the extracted text
-                    embedding = generate_embeddings(extracted_texts)
+                    # Generate huggingFaceEmbeddings for the extracted text
+                    embedding = generate_huggingFaceEmbeddings(extracted_texts)
                     print(embedding)
-                    embeddings.append(embedding)
+                    huggingFaceEmbeddings.append(embedding)
                     
                 else:
                     raise ValueError("Unsupported file type: {}".format(file_extension))
@@ -142,16 +154,16 @@ def upload_file(request):
                 return response
 
         # Compute average embedding for each document
-        average_embeddings = [compute_average_embedding(doc_embeddings) for doc_embeddings in embeddings]
+        average_huggingFaceEmbeddings = [compute_average_embedding(doc_huggingFaceEmbeddings) for doc_huggingFaceEmbeddings in huggingFaceEmbeddings]
 
         # Compare the uploaded document with documents in your database
-        for average_embedding in average_embeddings:
+        for average_embedding in average_huggingFaceEmbeddings:
             # You need to replace 'Space Movies' with the text you want to compare with
             # results =  collection.aggregate([
             #     {
             #         "$vectorSearch": {
             #             "queryVector": average_embedding,
-            #             "path": "plot_embeddings",
+            #             "path": "plot_huggingFaceEmbeddings",
             #             "numCandidates": 100,
             #             "limit": 4,
             #             "index": "PlotSemanticSearch",
@@ -203,9 +215,19 @@ def upload_file(request):
 
 
 
+# Function to generate huggingFaceEmbeddings for text
+def generate_huggingFaceEmbeddings_query(request) -> list[float]:
+    text = request.POST.get('query')
+    response = requests.post(API_URL, headers={"Authorization": f"Bearer {HUGGINGFACETOKENWriteToken}"}, json={"inputs": text})
+    # huggingFaceEmbeddings = response.json()["outputs"][0]["huggingFaceEmbeddings"]
+    return response.json()
 
-model_name = "sentence-transformers/all-MiniLM-L6-v2"
-model = SentenceTransformer(model_name)
+
+
+
+# model_name = "sentence-transformers/all-MiniLM-L6-v2"
+# model = SentenceTransformer(model_name)
+# embeddinggggg = model.encode()
 
 # tokenizer = TransformersTokenizer.from_pretrained(model_name)
 
@@ -216,17 +238,46 @@ model = SentenceTransformer(model_name)
 #   return embedding.cpu().detach().numpy()
 
 
+
 @csrf_exempt
 @permission_classes([AllowAny])
-def chat_constituition(query):
-    embeddingS = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
-    vectorStore = MongoDBAtlasVectorSearch(collection,embeddingS)
-    docs = vectorStore.similarity_search(query, K=1)
-    as_output = docs[0].page_content
-    
-    llm = HuggingFaceHub(repo_id = "google/flan-t5-xl", model_kwargs={"temperature" : 0, "max_lenght": 64})
-    retriever = vectorStore.as_retriever()
-    qa = RetrievalQA.from_chain_type(llm, chain_type="stuff", retriever= retriever)
-    retriever_output = qa.run()
+def chat_constituition(request):
+    # vectorStore = MongoDBAtlasVectorSearch(collection,huggingFaceEmbeddings)
 
-    return as_output, retriever_output
+    
+    body_unicode = request.body.decode('utf-8')
+    body_data = json.loads(body_unicode)
+        
+        # Access the "username" field from the JSON data
+    query = body_data.get("query")
+    # print(request.POST.get('query'))
+    print (">>>>>>>>>>>>>>>>>>> See the request",body_data)
+    vectorstore = MongoDBAtlasVectorSearch(
+    collection=consituitionCollection,
+    embedding = openAIEmbeddings,  # text embedding function
+    # embedding=huggingFaceEmbeddings,
+    index_name="consSemanSearch",
+)
+
+    # vectorstore similarith search will return the similar docs from the db 
+    # unlike retriever that gets the similar doc and chains it to an llm
+
+    docs = vectorstore.similarity_search(query, K=1)
+    # for doc in docs:
+
+    #     print(">>>>>>>>>>>>>>>>>>> THIS IS THE DOC FROM VECTOR STORE",doc.page_content)
+
+    if docs:
+            as_output = docs[0].page_content
+            # Continue with your code
+    as_output = "no information on your query"
+
+
+    # llm = HuggingFaceHub(repo_id = "google/flan-t5-xl", model_kwargs={"temperature" : 0, "max_lenght": 64})
+    llm = llm = ChatOpenAI()
+    retriever = vectorstore.as_retriever()
+    qa = RetrievalQA.from_chain_type(llm, chain_type="stuff", retriever= retriever)
+    retriever_output = qa.run(query)
+
+    # return as_output, retriever_output
+    return JsonResponse({'message':retriever_output,'as_output':"",'retriever_output':retriever_output}, status=200)

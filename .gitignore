@@ -1,0 +1,47 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local development settings
+.env
+
+# Database
+*.sqlite3
+*.db
+
+# Static files (usually collected by Django's collectstatic command)
+/staticfiles/
+
+# Media files
+/media/
+
+# Virtual environment
+venv/
+env/
+ENV/
+env
+/env
+/env/*
+env/*
+
+# Logs
+*.log
+
+# Ignore coverage reports
+.coverage
+htmlcov/
+
+# Ignore macOS folder attributes
+.DS_Store
+
+# Ignore Python bytecode files
+*.pyc
+
+# Ignore editor-specific files
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Ignore migration files (uncomment if you don't want to track migrations)
+# /<app_name>/migrations/
