@@ -61,14 +61,20 @@ huggingFaceEmbeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instruc
 
 openAIEmbeddings = OpenAIEmbeddings()
 
+# vectorstore = MongoDBAtlasVectorSearch(
+#     collection=consituitionCollection,
+#     embedding = huggingFaceEmbeddings,  # Replace with your text embedding function
+#     # embedding=huggingFaceEmbeddings,
+#     # index_name="caseSemanticSearch",
+# )
+
+
 vectorstore = MongoDBAtlasVectorSearch(
     collection=consituitionCollection,
-    embedding = huggingFaceEmbeddings,  # Replace with your text embedding function
+    embedding = openAIEmbeddings,  # text embedding function
     # embedding=huggingFaceEmbeddings,
-    # index_name="caseSemanticSearch",
+    index_name="consSemanSearch",
 )
-
-
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -251,13 +257,13 @@ def chat_constituition(request):
         # Access the "username" field from the JSON data
     query = body_data.get("query")
     # print(request.POST.get('query'))
-    print (">>>>>>>>>>>>>>>>>>> See the request",body_data)
-    vectorstore = MongoDBAtlasVectorSearch(
-    collection=consituitionCollection,
-    embedding = openAIEmbeddings,  # text embedding function
-    # embedding=huggingFaceEmbeddings,
-    index_name="consSemanSearch",
-)
+#     print (">>>>>>>>>>>>>>>>>>> See the request",body_data)
+#     vectorstore = MongoDBAtlasVectorSearch(
+#     collection=consituitionCollection,
+#     embedding = openAIEmbeddings,  # text embedding function
+#     # embedding=huggingFaceEmbeddings,
+#     index_name="consSemanSearch",
+# )
 
     # vectorstore similarith search will return the similar docs from the db 
     # unlike retriever that gets the similar doc and chains it to an llm
@@ -274,7 +280,7 @@ def chat_constituition(request):
 
 
     # llm = HuggingFaceHub(repo_id = "google/flan-t5-xl", model_kwargs={"temperature" : 0, "max_lenght": 64})
-    llm = llm = ChatOpenAI()
+    llm = ChatOpenAI()
     retriever = vectorstore.as_retriever()
     qa = RetrievalQA.from_chain_type(llm, chain_type="stuff", retriever= retriever)
     retriever_output = qa.run(query)
