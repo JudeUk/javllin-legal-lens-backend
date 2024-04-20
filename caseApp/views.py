@@ -248,42 +248,21 @@ def generate_huggingFaceEmbeddings_query(request) -> list[float]:
 @csrf_exempt
 @permission_classes([AllowAny])
 def chat_constituition(request):
-    # vectorStore = MongoDBAtlasVectorSearch(collection,huggingFaceEmbeddings)
-
-    
     body_unicode = request.body.decode('utf-8')
     body_data = json.loads(body_unicode)
-        
-        # Access the "username" field from the JSON data
     query = body_data.get("query")
-    # print(request.POST.get('query'))
-#     print (">>>>>>>>>>>>>>>>>>> See the request",body_data)
-#     vectorstore = MongoDBAtlasVectorSearch(
-#     collection=consituitionCollection,
-#     embedding = openAIEmbeddings,  # text embedding function
-#     # embedding=huggingFaceEmbeddings,
-#     index_name="consSemanSearch",
-# )
+    
+    # Perform vector search
+    # docs = vectorstore.similarity_search(query, K=1)
+    # as_output = docs[0].page_content if docs else "No information on your query"
 
-    # vectorstore similarith search will return the similar docs from the db 
-    # unlike retriever that gets the similar doc and chains it to an llm
-
-    docs = vectorstore.similarity_search(query, K=1)
-    # for doc in docs:
-
-    #     print(">>>>>>>>>>>>>>>>>>> THIS IS THE DOC FROM VECTOR STORE",doc.page_content)
-
-    if docs:
-            as_output = docs[0].page_content
-            # Continue with your code
-    as_output = "no information on your query"
-
-
-    # llm = HuggingFaceHub(repo_id = "google/flan-t5-xl", model_kwargs={"temperature" : 0, "max_lenght": 64})
+    # Initialize LLM and retriever
     llm = ChatOpenAI()
     retriever = vectorstore.as_retriever()
-    qa = RetrievalQA.from_chain_type(llm, chain_type="stuff", retriever= retriever)
+    qa = RetrievalQA.from_chain_type(llm, chain_type="stuff", retriever=retriever)
+    
+    # Run the retrieval QA
     retriever_output = qa.run(query)
 
-    # return as_output, retriever_output
-    return JsonResponse({'message':retriever_output,'as_output':"",'retriever_output':retriever_output}, status=200)
+    # Return response
+    return JsonResponse({'message': retriever_output, 'as_output': "", 'retriever_output': retriever_output}, status=200)
