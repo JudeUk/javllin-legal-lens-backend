@@ -18,13 +18,17 @@ import numpy as np
 import os
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt 
-from langchain_community.vectorstores import MongoDBAtlasVectorSearch
+# from langchain_community.vectorstores import MongoDBAtlasVectorSearch
+from langchain_mongodb import MongoDBAtlasVectorSearch
 # from transformers import TransformersTokenizer
 from sentence_transformers import SentenceTransformer
 from langchain_community.llms import HuggingFaceHub
-from langchain.chat_models import ChatOpenAI
+# from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain.chains import RetrievalQA
-from langchain.embeddings import HuggingFaceInstructEmbeddings,OpenAIEmbeddings
+# from langchain.embeddings import HuggingFaceInstructEmbeddings,OpenAIEmbeddings
+# from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 
 
 MONGODB_URI = os.getenv('DATABASE_URL')
@@ -46,6 +50,8 @@ headers = {"Authorization": f"Bearer {HUGGINGFACETOKEN}"}
 db = client.sample_mflix
 collection =db.movies
 
+collectionCases = db.cases
+
 
 constDb = client.ConstituitionDatabase
 consituitionCollection =constDb.constituitionCollection
@@ -57,7 +63,7 @@ court=""
 date=""
 similar_cases_response = []
 
-huggingFaceEmbeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
+# huggingFaceEmbeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
 
 openAIEmbeddings = OpenAIEmbeddings()
 
@@ -75,6 +81,8 @@ vectorstore = MongoDBAtlasVectorSearch(
     # embedding=huggingFaceEmbeddings,
     index_name="consSemanSearch",
 )
+
+llm = ChatOpenAI()
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -257,7 +265,7 @@ def chat_constituition(request):
     # as_output = docs[0].page_content if docs else "No information on your query"
 
     # Initialize LLM and retriever
-    llm = ChatOpenAI()
+    
     retriever = vectorstore.as_retriever()
     qa = RetrievalQA.from_chain_type(llm, chain_type="stuff", retriever=retriever)
     
