@@ -1,3 +1,4 @@
+import os
 from django.shortcuts import render
 
 # Create your views here.
@@ -6,8 +7,11 @@ from django.views.decorators.csrf import csrf_exempt
 from pymongo import MongoClient
 import json
 
-# Assuming you've configured djongo properly to use MongoDB
-client = MongoClient('mongodb://localhost:27017/')
+import pymongo
+
+MONGODB_URI = os.getenv('DATABASE_URL')
+
+client = pymongo.MongoClient(MONGODB_URI)
 db = client.sample_mflix
 collection = db.cases
 
@@ -15,17 +19,18 @@ collection = db.cases
 def search_case(request):
     if request.method == 'POST':
         data = json.loads(request.body)
-        case_id = data.get('case_id', None)
+        # case_id = data.get('case_id', None)
+        case_title = data.get('case_title', None)
 
-        if case_id:
+        if case_title:
             # Searching for the case in MongoDB
-            case = collection.find_one({'caseNumber': case_id})
+            case = collection.find_one({'case_title': case_title})
 
             if case:
                 # Case found, returning the case details
                 response_data = {
-                    'caseNumber': case.get('caseNumber'),
-                    'caseTitle': case.get('caseTitle'),
+                    'case_number': case.get('case_number'),
+                    'case_title': case.get('case_title'),
                     'court': case.get('court'),
                     'date': case.get('date')
                 }
@@ -39,3 +44,6 @@ def search_case(request):
     else:
         # If request method is not POST
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
+
+
+
