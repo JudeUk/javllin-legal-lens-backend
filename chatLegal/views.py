@@ -29,6 +29,8 @@ vectorstore = MongoDBAtlasVectorSearch(
     index_name="consSemanSearch",
 )
 
+retriever = vectorstore.as_retriever()
+qa = RetrievalQA.from_chain_type(llm, chain_type="stuff", retriever=retriever)
 
 @api_view(['POST'])
 @csrf_exempt
@@ -38,14 +40,19 @@ def chat_constituition(request):
         body_data = json.loads(request.body.decode('utf-8'))
         query = body_data.get("query")
         
-        retriever = vectorstore.as_retriever()
-        qa = RetrievalQA.from_chain_type(llm, chain_type="stuff", retriever=retriever)
-        
+       
+
+        print("<<<<<<<<<<<<<<<<<<<Retriever created>>>>>>>>>>>>>>>")
         # Run the retrieval QA
+
+        print("<<<<<<<<<<<<<<<<<<<Processing Retriever Output....")
         retriever_output = qa.run(query)
+
+        print("<<<<<<<<<<<<<<<<<<<Printing Retrirver output.",retriever_output)
+
 
         return JsonResponse({'message': retriever_output, 'as_output': "", 'retriever_output': retriever_output}, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-    finally:
-        client.close()
+    # finally:
+    #     client.close()
